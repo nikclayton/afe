@@ -51,3 +51,21 @@ func TestParseConfig(t *testing.T) {
 		t.Error(diff)
 	}
 }
+
+func TestHostPortString(t *testing.T) {
+	var tests = []struct {
+		in  HostPort
+		out string
+	}{
+		{HostPort{Address: "127.0.0.1", Port: 8080}, "127.0.0.1:8080"},
+		{HostPort{Address: "127.0.0.1"}, "127.0.0.1:0"},
+		{HostPort{Port: 8081}, ":8081"},
+	}
+
+	for _, tt := range tests {
+		s := tt.in.String()
+		if s != tt.out {
+			t.Errorf("got %q, want %q", s, tt.out)
+		}
+	}
+}

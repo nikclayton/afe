@@ -3,6 +3,7 @@
 package config
 
 import (
+	"fmt"
 	"io/ioutil"
 
 	"github.com/pkg/errors"
@@ -13,6 +14,11 @@ import (
 type HostPort struct {
 	Address string
 	Port    int
+}
+
+// String returns a "host:port" string for the HostPort.
+func (hp HostPort) String() string {
+	return fmt.Sprintf("%s:%d", hp.Address, hp.Port)
 }
 
 // A service consists of a name, a domain, and an array of

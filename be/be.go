@@ -28,26 +28,22 @@ func main() {
 
 	for _, service := range ProxyConfig.Proxy.Services {
 		for _, host := range service.Hosts {
-			hostport := fmt.Sprintf("%s:%d", host.Address, host.Port)
-
-			handler := func(w http.ResponseWriter, req *http.Request) {
-				_, err := io.WriteString(w, fmt.Sprintf("service: %s, addr: %s",
-					service.Name, hostport))
-				if err != nil {
-					log.Fatal(err)
-				}
-			}
-
 			wg.Add(1)
 
-			s := &http.Server{
-				Addr:    hostport,
-				Handler: http.HandlerFunc(handler),
-			}
-
-			log.Printf("HTTP server starting on %s\n", hostport)
+			hostport := host.String() // Avoid capturing host variable in go func()
 			go func() {
-				log.Fatal(s.ListenAndServe())
+				log.Printf("HTTP server starting on %s", hostport)
+
+				handler := func(w http.ResponseWriter, req *http.Request) {
+					log.Printf("%s handling request for %s", hostport, req.URL)
+					_, err := io.WriteString(w, fmt.Sprintf("service: %s, addr: %s",
+						service.Name, hostport))
+					if err != nil {
+						log.Fatal(err)
+					}
+				}
+
+				log.Fatal(http.ListenAndServe(hostport, http.HandlerFunc(handler)))
 				wg.Done() // NOTREACHED
 			}()
 		}
