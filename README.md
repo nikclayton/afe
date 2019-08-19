@@ -4,7 +4,7 @@ All commands are run from within the `afe` directory.
 
 ## Build the dummy backend
 
-The dummy backend listens on port 8080 and is a suitable backend for the proxy.
+The dummy backend parses the configuration file and starts listening on the addresses and ports defined in the `services` section.
 
 ```shell
 go build be/be.go
@@ -15,6 +15,8 @@ go build be/be.go
 ```shell
 ./be
 ```
+
+It logs a representation of the parsed configuration and all of the address/port pairs it is listening on.
 
 # Requirements
 
