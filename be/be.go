@@ -10,8 +10,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"sync"
+	"time"
 )
 
 var ProxyConfig config.ProxyConfig
@@ -35,6 +37,7 @@ func main() {
 				log.Printf("HTTP server starting on %s", hostport)
 
 				handler := func(w http.ResponseWriter, req *http.Request) {
+					time.Sleep(time.Duration(rand.Intn(300)) * time.Millisecond)
 					log.Printf("%s handling request for %s", hostport, req.URL)
 					_, err := io.WriteString(w, fmt.Sprintf("service: %s, addr: %s",
 						service.Name, hostport))
