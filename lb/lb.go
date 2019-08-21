@@ -62,7 +62,14 @@ func (proxy Proxy) handler(w http.ResponseWriter, req *http.Request) {
 	req.URL.RawQuery = q.Encode()
 	log.Printf("routing request for service %s\n", service)
 
+	var stats httpTraceStats
+	ctx := WithHTTPTrace(req.Context(), &stats)
+	req = req.WithContext(ctx)
+
 	backend.ServeHTTP(w, req)
+
+	stats.Done()
+	log.Printf("Stats: Service(%s) %s\n", service, stats.String())
 }
 
 // NewRandomBackendReverseProxy returns a new httputil.ReverseProxy which will
