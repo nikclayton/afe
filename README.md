@@ -106,6 +106,10 @@ The lb binary records the network durations of
 
 on a per-service basis, and logs the result in a human-readable format.
 
+It also exposes a `/metrics` endpoint with backend request latencies grouped in to percentile buckets.
+
+> Note: This means the proxy will not proxy requests for `/metrics`
+
 # Requirements
 
 - [x] Implement the proxy with a random-forwarding load balancing policy
@@ -114,7 +118,7 @@ on a per-service basis, and logs the result in a human-readable format.
 
 - [x] Define the main SLI that guarantee reliability, performance, and scalability
 
-- [-] Choose and implement _one_ of the SLIs
+- [x] Choose and implement _one_ of the SLIs
 
 # Options considered
 
@@ -123,3 +127,5 @@ Things I considered doing, didn't do because of the time, but would consider to 
 - Using a non-std logging library (log levels, logging to different locations, stack traces, etc)
 
 - Health checking the backends - a mechanism to ensure the proxy notices if a backend becomes slow or non-responsive, and to (temporarily) remove that backend from the backend pool
+
+- ACLs on the endpoints. I would block access to `/metrics` earlier in the network, but it's good defense-in-depth practice to block it here too (e.g., require requests come from IPs known to be internal to the organisation)

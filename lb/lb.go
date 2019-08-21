@@ -7,6 +7,11 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httputil"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type Proxy struct {
@@ -16,6 +21,19 @@ type Proxy struct {
 }
 
 var configPath = flag.String("config", "config.yaml", "full path to config file")
+
+var rpcDurations = prometheus.NewSummaryVec(
+	prometheus.SummaryOpts{
+		Name:       "proxy_backend_duration_ms",
+		Help:       "Proxy latency distributions for backend requests.",
+		Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+	},
+	[]string{"service"},
+)
+
+func init() {
+	prometheus.MustRegister(rpcDurations)
+}
 
 func main() {
 	proxy := Proxy{}
@@ -31,6 +49,7 @@ func main() {
 		proxy.reverseProxy[service.Domain] = NewRandomBackendReverseProxy(service.Hosts)
 	}
 
+	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/", proxy.handler)
 	log.Fatal(http.ListenAndServe(proxy.config.Listen.String(), nil))
 }
@@ -70,6 +89,7 @@ func (proxy Proxy) handler(w http.ResponseWriter, req *http.Request) {
 
 	stats.Done()
 	log.Printf("Stats: Service(%s) %s\n", service, stats.String())
+	rpcDurations.WithLabelValues(service).Observe(float64(stats.LatencyTotal / time.Millisecond))
 }
 
 // NewRandomBackendReverseProxy returns a new httputil.ReverseProxy which will
