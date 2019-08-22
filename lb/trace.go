@@ -14,6 +14,9 @@ type httpTraceStats struct {
 	gotConn        time.Time
 	wroteRequest   time.Time
 
+	// LatencyBackend records the time taken by the backend to process the request.
+	LatencyBackend time.Duration
+
 	// LatencyResponse records the time taken to receive the response from the backend after
 	// the request has been sent.
 	LatencyResponse      time.Duration
@@ -24,7 +27,8 @@ type httpTraceStats struct {
 }
 
 func (s *httpTraceStats) String() string {
-	return fmt.Sprintf("Request(%v) Response(%v) Total(%v)", s.LatencyRequest, s.LatencyResponse, s.LatencyTotal)
+	return fmt.Sprintf("Request(%v) Backend(%v) Response(%v) Total(%v)",
+		s.LatencyRequest, s.LatencyBackend, s.LatencyResponse, s.LatencyTotal)
 }
 
 // WithHTTPTrace returns a new context based on the provided context that records httptrace
@@ -50,5 +54,6 @@ func (s *httpTraceStats) Done() {
 	done := time.Now()
 	s.LatencyRequest = s.wroteRequest.Sub(s.gotConn)
 	s.LatencyResponse = done.Sub(s.gotFirstResponseByte)
+	s.LatencyBackend = s.gotFirstResponseByte.Sub(s.wroteRequest)
 	s.LatencyTotal = done.Sub(s.gotConn)
 }
