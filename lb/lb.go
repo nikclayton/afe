@@ -19,6 +19,8 @@ type Proxy struct {
 	config config.ProxyConfig
 	// reverseProxy maps a service domain to the ReverseProxy for that service
 	reverseProxy map[string]*httputil.ReverseProxy
+	// healthChecker determines whether the service is healthy or not
+	healthChecker func(*Proxy) error
 }
 
 var configPath = flag.String("config", "config.yaml", "full path to config file")
@@ -37,7 +39,9 @@ func init() {
 }
 
 func main() {
-	proxy := Proxy{}
+	proxy := Proxy{
+		healthChecker: okHealthCheck,
+	}
 
 	if err := config.ParseConfigFromFile(*configPath, &proxy.config); err != nil {
 		log.Fatal(err)
@@ -65,11 +69,16 @@ func main() {
 // Handles health checks by looking for a "health-check" header. If
 // present then the request is not proxied, and an indication of the
 // server's health is returned.
-func (proxy Proxy) handler(w http.ResponseWriter, req *http.Request) {
-	health := req.Header.Get("health-check")
-	if health != "" {
+func (proxy *Proxy) handler(w http.ResponseWriter, req *http.Request) {
+	isHealthCheck := req.Header.Get("health-check")
+	if isHealthCheck != "" {
+		if err := proxy.healthChecker(proxy); err != nil {
+			http.Error(w, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
 		_, err := io.WriteString(w, "ok")
 		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			log.Fatalf("writing health check response failed: %v", err)
 		}
 		return
@@ -104,6 +113,12 @@ func (proxy Proxy) handler(w http.ResponseWriter, req *http.Request) {
 	stats.Done()
 	log.Printf("Stats: Service(%s) %s\n", service, stats.String())
 	rpcDurations.WithLabelValues(service).Observe(float64(stats.LatencyTotal / time.Millisecond))
+}
+
+// okHealthChecker is a health checker that always returns no
+// errors.
+func okHealthCheck(proxy *Proxy) error {
+	return nil
 }
 
 // NewRandomBackendReverseProxy returns a new httputil.ReverseProxy which will
