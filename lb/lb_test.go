@@ -7,6 +7,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
+	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -159,3 +162,60 @@ func TestInvalidSParam(t *testing.T) {
 
 // Note: No need to check to see if health checks with missing s= params
 // work, as the parameter is not set in the existing health check code.
+
+// TestProxyFunctionality starts a test server to act as a backend to the
+// proxy, then configures the proxy to use it as a backed, connects to
+// the proxy and verifies that the expected result is returned.
+func TestProxyFunctionality(t *testing.T) {
+	proxy := Proxy{
+		config:        goldenConfig,
+		healthChecker: okHealthCheck,
+	}
+
+	// Backend server to proxy for. Start it running, and update the proxy
+	// config so it's the only host.
+	backendResp := "this is the backend"
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, backendResp)
+	}))
+	defer backend.Close()
+
+	backendUrl, err := url.Parse(backend.URL)
+	if err != nil {
+		t.Fatalf("could not parse '%s' as a URL: %+v", backend.URL, err)
+	}
+
+	parsedPort, err := strconv.ParseInt(backendUrl.Port(), 10, 0)
+	if err != nil {
+		t.Fatalf("could not parse '%s' as an int: %+v", backendUrl.Port(), err)
+	}
+	proxy.config.Services[0].Hosts = []config.HostPort{{
+		Address: backendUrl.Hostname(),
+		Port:    int(parsedPort),
+	}}
+
+	proxy.reverseProxy = make(map[string]*httputil.ReverseProxy)
+	proxy.reverseProxy["my-service.my-company.com"] = NewRandomBackendReverseProxy(
+		proxy.config.Services[0].Hosts,
+	)
+
+	// Start the proxy, connect, verify we get the correct response
+	ts := httptest.NewServer(http.HandlerFunc(proxy.handler))
+	defer ts.Close()
+
+	resp, err := http.Get(fmt.Sprintf("%s/?s=my-service.my-company.com", ts.URL))
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("could not read response body: %+v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("got %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+	if strings.TrimSpace(string(result)) != backendResp {
+		t.Fatalf("got '%s', want '%s' as response body", result, "service not found")
+	}
+}
