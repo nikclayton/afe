@@ -41,6 +41,26 @@ type ProxyConfig struct {
 	Proxy
 }
 
+// Copy performs a deep copy of the ProxyConfig.
+func (pc ProxyConfig) Copy(to *ProxyConfig) {
+	*to = ProxyConfig{}
+	to.Listen = pc.Listen
+	for _, service := range pc.Services {
+		s := Service{
+			Name:   service.Name,
+			Domain: service.Domain,
+		}
+		for _, host := range service.Hosts {
+			h := HostPort{
+				Address: host.Address,
+				Port:    host.Port,
+			}
+			s.Hosts = append(s.Hosts, h)
+		}
+		to.Services = append(to.Services, s)
+	}
+}
+
 // ParseConfigFromFile parses the YAML configuration from filename in to
 // the provided ProxyConfig.
 func ParseConfigFromFile(filename string, config *ProxyConfig) error {
@@ -60,4 +80,51 @@ func ParseConfig(data []byte, config *ProxyConfig) error {
 	}
 
 	return nil
+}
+
+// ValidateConfig verifies the configuration appears sensible. If not it
+// returns one or more errors identified in the configuration.
+func ValidateConfig(config *ProxyConfig) []error {
+	var errs []error
+	// if config.Listen.Address == "" {
+	//
+	// }
+	//
+	// This is sometimes OK, e.g., to bind to whatever the host's first IP
+	// is without caring what it is.
+
+	if config.Listen.Port == 0 {
+		errs = append(errs, errors.New("Listen Port is not set"))
+	}
+
+	if len(config.Services) == 0 {
+		errs = append(errs, errors.New("No services have been defined"))
+	}
+
+	for i, service := range config.Services {
+		if service.Name == "" {
+			errs = append(errs, errors.Errorf("The service at index %d has no name", i))
+			continue // No sense checking other parts, can't report the name
+		}
+
+		if service.Domain == "" {
+			errs = append(errs, errors.Errorf("Service %s has no domain", service.Name))
+		}
+
+		if len(service.Hosts) == 0 {
+			errs = append(errs, errors.Errorf("Service %s has no hosts", service.Name))
+		}
+
+		for j, host := range service.Hosts {
+			if host.Address == "" {
+				errs = append(errs, errors.Errorf("The %d host in service %s has no address", j, service.Name))
+			}
+
+			if host.Port == 0 {
+				errs = append(errs, errors.Errorf("The %d host in service %s has no port", j, service.Name))
+			}
+		}
+	}
+
+	return errs
 }
