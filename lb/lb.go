@@ -35,17 +35,17 @@ type Proxy struct {
 
 var configPath = flag.String("config", "config.yaml", "full path to config file")
 
-var rpcDurations = prometheus.NewSummaryVec(
+var httpClientDurations = prometheus.NewSummaryVec(
 	prometheus.SummaryOpts{
 		Name:       "proxy_backend_duration_ms",
 		Help:       "Proxy latency distributions for backend requests.",
-		Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+		Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001, 1.0: 0.0},
 	},
 	[]string{"service"},
 )
 
 func init() {
-	prometheus.MustRegister(rpcDurations)
+	prometheus.MustRegister(httpClientDurations)
 }
 
 func main() {
@@ -150,7 +150,7 @@ func (proxy Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	stats.Done()
 	log.Printf("Stats: Service(%s) %s\n", service, stats.String())
-	rpcDurations.WithLabelValues(service).Observe(float64(stats.LatencyTotal / time.Millisecond))
+	httpClientDurations.WithLabelValues(service).Observe(float64(stats.LatencyTotal / time.Millisecond))
 }
 
 // okHealthChecker is a health checker that always returns no
