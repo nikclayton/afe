@@ -3,11 +3,13 @@ package main
 import (
 	"afe/config"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"math/rand"
 	"net/http"
 	"net/http/httputil"
+	"os"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -47,9 +49,12 @@ func init() {
 }
 
 func main() {
-	proxy, err := NewProxyFromFile(*configPath, okHealthCheck)
-	if err != nil {
-		log.Fatal(err)
+	proxy, errs := NewProxyFromFile(*configPath, okHealthCheck)
+	if errs != nil {
+		for _, err := range errs {
+			fmt.Printf("error: %v\n", err)
+		}
+		os.Exit(1)
 	}
 
 	log.Printf("config: %+v", proxy.config)
