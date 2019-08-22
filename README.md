@@ -186,3 +186,6 @@ Things I considered doing, didn't do because of the time, but would consider to 
 - Health checking should be a library for reuse in other servers, and protected by an ACL.
 
 - Explicit resource requirements in the Helm/Kubernetes configuration.
+
+- The tests and the code share string constants which could be hoisted out in
+  to real constants.
