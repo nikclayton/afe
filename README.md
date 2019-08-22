@@ -1,4 +1,4 @@
-# Building and running
+# Building and running (locally)
 
 All commands are run from within the `afe` directory.
 
@@ -47,6 +47,59 @@ Both commands support a `--config` parameter to specify an alternate location fo
 The following assumes you haven't changed the default configuration. Adjust as necessasry.
 
 Visit `http://localhost:8080/?s=my-service.my-company.com`. The `lb` shell will log which of the two backends has been selected to proxy the request to, the `be` shell will show details of the received request, and the browser should show which of the two addresses was selected.
+
+# Building and running (Docker, minikube)
+
+> Note: See e.g. https://docs.bitnami.com/kubernetes/get-started-kubernetes/ for minikube/helm/tiller installation doc
+
+> Note: Instructions suitable for hobbyist deployment.
+
+## Update `config.yaml`
+
+- Set the listen address to the empty string to bind correctly
+- Update the list of backends as necessary
+
+## Start minikube (if necessary)
+
+```shell
+minikube start
+```
+
+## Build for Linux
+
+Only necessary if building on a non-Linux host.
+
+```shell
+set GOOS=linux
+go build -o lb.linux lb/lb.go lb/trace.go
+```
+
+## Build the container image
+
+```shell
+docker build -t nikclayton/go-afe:0.1.0 .
+```
+
+Update the version number as necessary. A version may exist on DockerHub, in which case you can use that.
+
+Make sure it runs, with
+
+```shell
+docker run -it nikclayton/go-afe:0.1.0
+```
+
+## Install the new build
+
+```shell
+helm delete --purge go-afe
+helm install -n go-afe ./helm-chart/go-afe
+```
+
+## Check for the service's host/port
+
+```shell
+minikube service list
+```
 
 # Service SLIs
 
@@ -114,7 +167,7 @@ It also exposes a `/metrics` endpoint with backend request latencies grouped in 
 
 - [x] Implement the proxy with a random-forwarding load balancing policy
 
-- [ ] Provide a helm chart to deploy the proxy
+- [x] Provide a helm chart to deploy the proxy
 
 - [x] Define the main SLI that guarantee reliability, performance, and scalability
 
@@ -129,3 +182,7 @@ Things I considered doing, didn't do because of the time, but would consider to 
 - Health checking the backends - a mechanism to ensure the proxy notices if a backend becomes slow or non-responsive, and to (temporarily) remove that backend from the backend pool
 
 - ACLs on the endpoints. I would block access to `/metrics` earlier in the network, but it's good defense-in-depth practice to block it here too (e.g., require requests come from IPs known to be internal to the organisation)
+
+- Health checking should be a library for reuse in other servers, and protected by an ACL.
+
+- Explicit resource requirements in the Helm/Kubernetes configuration.

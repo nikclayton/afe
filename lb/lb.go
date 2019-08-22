@@ -3,6 +3,7 @@ package main
 import (
 	"afe/config"
 	"flag"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
@@ -60,7 +61,20 @@ func main() {
 // the domain of the target of the incoming request. Since I can't
 // trivially configure that, look for the first 's' parameter in the
 // URL query string and select the service and backends based on that.
+//
+// Handles health checks by looking for a "health-check" header. If
+// present then the request is not proxied, and an indication of the
+// server's health is returned.
 func (proxy Proxy) handler(w http.ResponseWriter, req *http.Request) {
+	health := req.Header.Get("health-check")
+	if health != "" {
+		_, err := io.WriteString(w, "ok")
+		if err != nil {
+			log.Fatalf("writing health check response failed: %v", err)
+		}
+		return
+	}
+
 	q := req.URL.Query()
 	service := q.Get("s")
 
