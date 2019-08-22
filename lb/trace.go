@@ -16,8 +16,8 @@ type httpTraceStats struct {
 
 	// LatencyResponse records the time taken to receive the response from the backend after
 	// the request has been sent.
-	LatencyResponse time.Duration
-	done            time.Time
+	LatencyResponse      time.Duration
+	gotFirstResponseByte time.Time
 
 	// LatencyTotal records the total time taken to send and receive the response.
 	LatencyTotal time.Duration
@@ -37,14 +37,18 @@ func WithHTTPTrace(ctx context.Context, s *httpTraceStats) context.Context {
 
 		WroteRequest: func(info httptrace.WroteRequestInfo) {
 			s.wroteRequest = time.Now()
-			s.LatencyRequest = s.wroteRequest.Sub(s.gotConn)
+		},
+
+		GotFirstResponseByte: func() {
+			s.gotFirstResponseByte = time.Now()
 		},
 	})
 }
 
 // Done records the time that the request completed.
 func (s *httpTraceStats) Done() {
-	s.done = time.Now()
-	s.LatencyResponse = s.done.Sub(s.wroteRequest)
-	s.LatencyTotal = s.done.Sub(s.gotConn)
+	done := time.Now()
+	s.LatencyRequest = s.wroteRequest.Sub(s.gotConn)
+	s.LatencyResponse = done.Sub(s.gotFirstResponseByte)
+	s.LatencyTotal = done.Sub(s.gotConn)
 }
