@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"net/http/httputil"
 	"net/url"
 	"strconv"
 	"strings"
@@ -26,9 +25,6 @@ var goldenConfig = config.ProxyConfig{
 			Hosts: []config.HostPort{{
 				Address: "127.0.0.1",
 				Port:    9090,
-			}, {
-				Address: "127.0.0.1",
-				Port:    9091,
 			}},
 		}},
 	},
@@ -37,10 +33,7 @@ var goldenConfig = config.ProxyConfig{
 // TestHealthChecksOK verifies that health checks expected to succeed
 // do succeed.
 func TestHealthChecksOK(t *testing.T) {
-	proxy := Proxy{
-		config:        goldenConfig,
-		healthChecker: okHealthCheck,
-	}
+	proxy, _ := NewProxyFromConfig(&goldenConfig, okHealthCheck)
 
 	ts := httptest.NewServer(proxy)
 	defer ts.Close()
@@ -69,12 +62,9 @@ func TestHealthChecksOK(t *testing.T) {
 // do fail.
 func TestHealthChecksFail(t *testing.T) {
 	checkErr := errors.New("failed health check")
-	proxy := Proxy{
-		config: goldenConfig,
-		healthChecker: func(proxy *Proxy) error {
-			return checkErr
-		},
-	}
+	proxy, _ := NewProxyFromConfig(&goldenConfig, func(proxy *Proxy) error {
+		return checkErr
+	})
 
 	ts := httptest.NewServer(proxy)
 	defer ts.Close()
@@ -102,10 +92,7 @@ func TestHealthChecksFail(t *testing.T) {
 // TestMissingSParam verifies that requests without an s= parameter
 // generate an error.
 func TestMissingSParam(t *testing.T) {
-	proxy := Proxy{
-		config:        goldenConfig,
-		healthChecker: okHealthCheck,
-	}
+	proxy, _ := NewProxyFromConfig(&goldenConfig, okHealthCheck)
 
 	ts := httptest.NewServer(proxy)
 	defer ts.Close()
@@ -135,10 +122,7 @@ func TestMissingSParam(t *testing.T) {
 // generate different responses for internal requests that include more
 // detailed debugging information that would be differentiated in the tests.
 func TestInvalidSParam(t *testing.T) {
-	proxy := Proxy{
-		config:        goldenConfig,
-		healthChecker: okHealthCheck,
-	}
+	proxy, _ := NewProxyFromConfig(&goldenConfig, okHealthCheck)
 
 	ts := httptest.NewServer(proxy)
 	defer ts.Close()
@@ -167,11 +151,6 @@ func TestInvalidSParam(t *testing.T) {
 // proxy, then configures the proxy to use it as a backed, connects to
 // the proxy and verifies that the expected result is returned.
 func TestProxyFunctionality(t *testing.T) {
-	proxy := Proxy{
-		config:        goldenConfig,
-		healthChecker: okHealthCheck,
-	}
-
 	// Backend server to proxy for. Start it running, and update the proxy
 	// config so it's the only host.
 	backendResp := "this is the backend"
@@ -189,15 +168,15 @@ func TestProxyFunctionality(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not parse '%s' as an int: %+v", backendUrl.Port(), err)
 	}
-	proxy.config.Services[0].Hosts = []config.HostPort{{
+
+	// Configure the proxy with a custom backend.
+	testConfig := config.ProxyConfig{}
+	goldenConfig.Copy(&testConfig)
+	testConfig.Services[0].Hosts = []config.HostPort{{
 		Address: backendUrl.Hostname(),
 		Port:    int(parsedPort),
 	}}
-
-	proxy.reverseProxy = make(map[string]*httputil.ReverseProxy)
-	proxy.reverseProxy["my-service.my-company.com"] = NewRandomBackendReverseProxy(
-		proxy.config.Services[0].Hosts,
-	)
+	proxy, _ := NewProxyFromConfig(&testConfig, okHealthCheck)
 
 	// Start the proxy, connect, verify we get the correct response
 	ts := httptest.NewServer(proxy)

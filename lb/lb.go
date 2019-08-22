@@ -47,24 +47,49 @@ func init() {
 }
 
 func main() {
-	proxy := Proxy{
-		healthChecker: okHealthCheck,
-	}
-
-	if err := config.ParseConfigFromFile(*configPath, &proxy.config); err != nil {
+	proxy, err := NewProxyFromFile(*configPath, okHealthCheck)
+	if err != nil {
 		log.Fatal(err)
 	}
 
 	log.Printf("config: %+v", proxy.config)
 
-	proxy.reverseProxy = make(map[string]*httputil.ReverseProxy)
-	for _, service := range proxy.config.Proxy.Services {
-		proxy.reverseProxy[service.Domain] = NewRandomBackendReverseProxy(service.Hosts)
-	}
-
 	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/", proxy)
 	log.Fatal(http.ListenAndServe(proxy.config.Listen.String(), nil))
+}
+
+// NewProxyFromFile returns a new Proxy initialised with the configuration
+// from the given file, and the given healthchecker.
+func NewProxyFromFile(filename string, hc HealthChecker) (*Proxy, []error) {
+	cfg := config.ProxyConfig{}
+
+	if err := config.ParseConfigFromFile(filename, &cfg); err != nil {
+		return nil, []error{err}
+	}
+
+	return NewProxyFromConfig(&cfg, hc)
+}
+
+// NewProxyFromConfig returns a new Proxy initialised with the given
+// config and healthChecker.
+func NewProxyFromConfig(cfg *config.ProxyConfig, hc HealthChecker) (*Proxy, []error) {
+	errs := config.ValidateConfig(cfg)
+	if errs != nil {
+		return nil, errs
+	}
+
+	p := &Proxy{
+		config:        *cfg,
+		healthChecker: hc,
+	}
+
+	p.reverseProxy = make(map[string]*httputil.ReverseProxy)
+	for _, service := range p.config.Proxy.Services {
+		p.reverseProxy[service.Domain] = NewRandomBackendReverseProxy(service.Hosts)
+	}
+
+	return p, nil
 }
 
 // ServeHTTP implements the generic proxy.
