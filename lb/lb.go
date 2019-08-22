@@ -15,6 +15,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// A Proxy implements the http.Handler interface and routes requests
+// to backends in its configuration.
 type Proxy struct {
 	config config.ProxyConfig
 	// reverseProxy maps a service domain to the ReverseProxy for that service
@@ -55,11 +57,11 @@ func main() {
 	}
 
 	http.Handle("/metrics", promhttp.Handler())
-	http.HandleFunc("/", proxy.handler)
+	http.Handle("/", proxy)
 	log.Fatal(http.ListenAndServe(proxy.config.Listen.String(), nil))
 }
 
-// handler implements the generic proxy.
+// ServeHTTP implements the generic proxy.
 //
 // If this was a real application requests would be proxied based on
 // the domain of the target of the incoming request. Since I can't
@@ -69,10 +71,10 @@ func main() {
 // Handles health checks by looking for a "health-check" header. If
 // present then the request is not proxied, and an indication of the
 // server's health is returned.
-func (proxy *Proxy) handler(w http.ResponseWriter, req *http.Request) {
+func (proxy Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	isHealthCheck := req.Header.Get("health-check")
 	if isHealthCheck != "" {
-		if err := proxy.healthChecker(proxy); err != nil {
+		if err := proxy.healthChecker(&proxy); err != nil {
 			http.Error(w, err.Error(), http.StatusServiceUnavailable)
 			return
 		}

@@ -42,7 +42,7 @@ func TestHealthChecksOK(t *testing.T) {
 		healthChecker: okHealthCheck,
 	}
 
-	ts := httptest.NewServer(http.HandlerFunc(proxy.handler))
+	ts := httptest.NewServer(proxy)
 	defer ts.Close()
 
 	req, _ := http.NewRequest("GET", ts.URL, nil)
@@ -76,7 +76,7 @@ func TestHealthChecksFail(t *testing.T) {
 		},
 	}
 
-	ts := httptest.NewServer(http.HandlerFunc(proxy.handler))
+	ts := httptest.NewServer(proxy)
 	defer ts.Close()
 
 	req, _ := http.NewRequest("GET", ts.URL, nil)
@@ -107,7 +107,7 @@ func TestMissingSParam(t *testing.T) {
 		healthChecker: okHealthCheck,
 	}
 
-	ts := httptest.NewServer(http.HandlerFunc(proxy.handler))
+	ts := httptest.NewServer(proxy)
 	defer ts.Close()
 
 	resp, err := http.Get(ts.URL)
@@ -140,7 +140,7 @@ func TestInvalidSParam(t *testing.T) {
 		healthChecker: okHealthCheck,
 	}
 
-	ts := httptest.NewServer(http.HandlerFunc(proxy.handler))
+	ts := httptest.NewServer(proxy)
 	defer ts.Close()
 
 	resp, err := http.Get(fmt.Sprintf("%s/?s=foo", ts.URL))
@@ -200,7 +200,7 @@ func TestProxyFunctionality(t *testing.T) {
 	)
 
 	// Start the proxy, connect, verify we get the correct response
-	ts := httptest.NewServer(http.HandlerFunc(proxy.handler))
+	ts := httptest.NewServer(proxy)
 	defer ts.Close()
 
 	resp, err := http.Get(fmt.Sprintf("%s/?s=my-service.my-company.com", ts.URL))
