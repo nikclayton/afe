@@ -15,6 +15,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// A HealthChecker determines whether the service is healthy, and returns
+// a non-nil error if it is not. It has access to the proxy configuration
+// so that it can health determinations based on, e.g., the health of the
+// configured backends.
+type HealthChecker func(*Proxy) error
+
 // A Proxy implements the http.Handler interface and routes requests
 // to backends in its configuration.
 type Proxy struct {
@@ -22,7 +28,7 @@ type Proxy struct {
 	// reverseProxy maps a service domain to the ReverseProxy for that service
 	reverseProxy map[string]*httputil.ReverseProxy
 	// healthChecker determines whether the service is healthy or not
-	healthChecker func(*Proxy) error
+	healthChecker HealthChecker
 }
 
 var configPath = flag.String("config", "config.yaml", "full path to config file")
